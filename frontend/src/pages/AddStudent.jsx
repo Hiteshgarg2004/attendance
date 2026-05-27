@@ -7,6 +7,7 @@ export default function AddStudent() {
   const { id } = useParams(); // class id
   const [name, setName] = useState("");
   const [rollNo, setRollNo] = useState("");
+  const [academicYear, setAcademicYear] = useState(new Date().getFullYear());
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -16,7 +17,7 @@ export default function AddStudent() {
     setLoading(true);
     setError("");
     try {
-      await API.post("/students", { name, rollNo, classId: id });
+      await API.post("/students", { name, rollNo, classId: id, academicYear });
       setName("");
       setRollNo("");
       showToast("Student added!", "success");
@@ -54,6 +55,19 @@ export default function AddStudent() {
             className="w-full p-3 border border-gray-300 rounded-lg"
             placeholder="Enter roll number"
           />
+        </div>
+        <div>
+          <label className="block mb-1 font-medium">Academic Year</label>
+          <select
+            value={academicYear}
+            onChange={(e) => setAcademicYear(parseInt(e.target.value))}
+            required
+            className="w-full p-3 border border-gray-300 rounded-lg"
+          >
+            {[2022, 2023, 2024, 2025, 2026].map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
         </div>
         {error && <p className="text-red-500">{error}</p>}
         <button

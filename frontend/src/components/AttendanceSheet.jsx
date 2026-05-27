@@ -4,19 +4,37 @@ import API from '../api/apiClient'
 
 export default function AttendanceSheet({ classId }){
 const [students, setStudents] = useState([])
-const [date, setDate] = useState(new Date().toISOString().slice(0,10))
+const getLocalDateString = (date = new Date()) => {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const [date, setDate] = useState(getLocalDateString())
 const [presentMap, setPresentMap] = useState({})
 
 
 useEffect(()=>{
 async function load(){
+try {
 const s = await API.get('/students', { params: { classId } })
 setStudents(s.data)
-const att = await API.get('/attendance', { params: { classId, date } }).catch(()=>null)
+const att = await API.get('/attendance', { params: { classId, date } })
 if(att?.data?.records){
 const map = {}
-att.data.records.forEach(r=>map[r.student._id || r.student] = r.present)
+att.data.records.forEach(r=>{
+  // Handle both cases: r.student could be an object or a string
+  const studentId = r.student?._id || r.student;
+  if (studentId) {
+    map[studentId] = r.present;
+  }
+})
 setPresentMap(map)
+}
+} catch(err) {
+console.error("Error loading attendance:", err);
 }
 }
 load()
@@ -26,7 +44,8 @@ load()
 const toggle = id => setPresentMap(pm => ({ ...pm, [id]: !pm[id] }))
 const save = async () => {
 const records = students.map(st => ({ studentId: st._id, present: !!presentMap[st._id] }))
-await API.post('/attendance', { classId, date, records })
+// Use /mark endpoint which correctly handles date filtering
+await API.post('/attendance/mark', { classId, date, records })
 alert('Saved!')
 }
 
