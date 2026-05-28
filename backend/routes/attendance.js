@@ -672,11 +672,15 @@ router.post(
         signature,
       };
 
-      // Encode the data for URL
-      const encodedData = encodeURIComponent(JSON.stringify(qrTokenData));
+      const qrSearchParams = new URLSearchParams({
+        token: sessionToken,
+        classId,
+        timestamp: String(timestamp),
+        signature,
+      });
 
       // Generate the full URL that should be embedded in the QR code
-      const attendanceUrl = `${FRONTEND_URL}/student?data=${encodedData}`;
+      const attendanceUrl = `${FRONTEND_URL.replace(/\/$/, "")}/student?${qrSearchParams.toString()}`;
 
       res.json({
         sessionToken,
