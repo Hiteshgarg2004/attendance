@@ -188,7 +188,6 @@ export default function StudentAttendance() {
       setQrData(parsedQrData);
     } else {
       setMessage("Invalid QR code");
-
       setMessageType("error");
     }
   }, [searchParams]);
