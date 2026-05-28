@@ -5,6 +5,60 @@ import {
 } from "react-router-dom";
 import API from "../api/apiClient";
 
+function parseQrData(searchParams) {
+  const token = searchParams.get("token");
+  const classId = searchParams.get("classId");
+  const timestamp = searchParams.get("timestamp");
+  const signature = searchParams.get("signature");
+
+  if (token && classId && timestamp && signature) {
+    return {
+      token,
+      classId,
+      timestamp,
+      signature,
+    };
+  }
+
+  const encodedQrData = searchParams.get("data");
+
+  if (!encodedQrData) {
+    return null;
+  }
+
+  const candidates = [encodedQrData];
+
+  try {
+    candidates.push(decodeURIComponent(encodedQrData));
+  } catch {
+    // The data may already be decoded by URLSearchParams.
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+
+      if (
+        parsed?.token &&
+        parsed?.classId &&
+        parsed?.timestamp &&
+        parsed?.signature
+      ) {
+        return {
+          token: parsed.token,
+          classId: parsed.classId,
+          timestamp: String(parsed.timestamp),
+          signature: parsed.signature,
+        };
+      }
+    } catch {
+      // Keep trying other supported QR payload formats.
+    }
+  }
+
+  return null;
+}
+
 export default function StudentAttendance() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -127,33 +181,13 @@ export default function StudentAttendance() {
      GET QR PARAMS FROM URL
   ========================================================= */
   useEffect(() => {
-    const token =
-      searchParams.get("token");
+    const parsedQrData =
+      parseQrData(searchParams);
 
-    const classId =
-      searchParams.get("classId");
-
-    const timestamp =
-      searchParams.get("timestamp");
-
-    const signature =
-      searchParams.get("signature");
-
-    if (
-      token &&
-      classId &&
-      timestamp &&
-      signature
-    ) {
-      setQrData({
-        token,
-        classId,
-        timestamp,
-        signature,
-      });
+    if (parsedQrData) {
+      setQrData(parsedQrData);
     } else {
       setMessage("Invalid QR code");
-
       setMessageType("error");
     }
   }, [searchParams]);
