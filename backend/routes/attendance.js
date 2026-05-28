@@ -2,6 +2,7 @@ import express from "express";
 import crypto from "crypto";
 import Attendance from "../models/Attendance.js";
 import Class from "../models/Class.js";
+import QrSession from "../models/QrSession.js";
 import protect from "../utils/auth.js";
 
 const router = express.Router();
@@ -51,8 +52,6 @@ function verifySignature(
     expectedBuffer
   );
 }
-
-const qrSessions = new Map();
 
 function getDateRange(date) {
   const [year, month, day] = date.split("-").map(Number);
@@ -136,7 +135,10 @@ router.post("/qr/verify", async (req, res) => {
       rollNo
     );
 
-    const session = qrSessions.get(token);
+    const session = await QrSession.findOne({
+      token,
+      isActive: true,
+    });
 
     if (!session) {
       return res.status(400).json({
@@ -144,8 +146,9 @@ router.post("/qr/verify", async (req, res) => {
       });
     }
 
-    if (Date.now() > session.expiresAt) {
-      qrSessions.delete(token);
+    if (Date.now() > session.expiresAt.getTime()) {
+      session.isActive = false;
+      await session.save();
 
       return res.status(400).json({
         message: "QR code has expired",
@@ -156,7 +159,7 @@ router.post("/qr/verify", async (req, res) => {
 
     if (
       session.startTime &&
-      now < session.startTime
+      now < session.startTime.getTime()
     ) {
       return res.status(400).json({
         message:
@@ -166,8 +169,11 @@ router.post("/qr/verify", async (req, res) => {
 
     if (
       session.endTime &&
-      now > session.endTime
+      now > session.endTime.getTime()
     ) {
+      session.isActive = false;
+      await session.save();
+
       return res.status(400).json({
         message:
           "QR code has expired.",
@@ -178,12 +184,19 @@ router.post("/qr/verify", async (req, res) => {
       const isValidSignature =
         verifySignature(
           token,
-          session.classId,
+          session.classId.toString(),
           timestamp,
           signature
         );
 
-      if (!isValidSignature) {
+      const isMatchingTimestamp =
+        String(session.qrTimestamp) ===
+        String(timestamp);
+
+      if (
+        !isValidSignature ||
+        !isMatchingTimestamp
+      ) {
         return res.status(400).json({
           message: "Invalid QR signature",
         });
@@ -217,8 +230,10 @@ router.post("/qr/verify", async (req, res) => {
     }
 
     if (
-      session.studentsMarked.includes(
-        student._id.toString()
+      session.studentsMarked.some(
+        (markedStudentId) =>
+          markedStudentId.toString() ===
+          student._id.toString()
       )
     ) {
       return res.status(400).json({
@@ -257,9 +272,8 @@ router.post("/qr/verify", async (req, res) => {
       scanTimestamp: new Date(),
     });
 
-    session.studentsMarked.push(
-      student._id.toString()
-    );
+    session.studentsMarked.push(student._id);
+    await session.save();
 
     res.json({
       success: true,
@@ -632,14 +646,12 @@ router.post(
       }
 
       const timestamp = Date.now();
+      const validityMs =
+        validityMinutes * 60 * 1000;
 
       const sessionToken = `${classId}-${timestamp}-${Math.random()
         .toString(36)
         .substr(2, 9)}`;
-
-      const expiresAt =
-        Date.now() +
-        validityMinutes * 60 * 1000;
 
       const signature =
         generateSignature(
@@ -648,17 +660,40 @@ router.post(
         );
 
       const scanStartTime = startTime
-        ? new Date(startTime).getTime()
+        ? new Date(startTime)
         : null;
 
-      const scanEndTime = endTime
-        ? new Date(endTime).getTime()
-        : expiresAt + 15 * 60 * 1000;
+      const effectiveStartTime =
+        scanStartTime?.getTime() ??
+        Date.now();
 
-      qrSessions.set(sessionToken, {
+      const scanEndTime = endTime
+        ? new Date(endTime)
+        : new Date(
+            effectiveStartTime +
+              validityMs
+          );
+
+      await QrSession.updateMany(
+        {
+          classId,
+          isActive: true,
+        },
+        {
+          $set: {
+            isActive: false,
+            endTime: new Date(),
+            expiresAt: new Date(),
+          },
+        }
+      );
+
+      const session = await QrSession.create({
+        token: sessionToken,
         classId,
         teacherId: req.teacher?._id,
-        expiresAt,
+        qrTimestamp: timestamp,
+        expiresAt: scanEndTime,
         startTime: scanStartTime,
         endTime: scanEndTime,
         studentsMarked: [],
@@ -684,9 +719,14 @@ router.post(
 
       res.json({
         sessionToken,
-        expiresAt,
-        scanStartTime,
-        scanEndTime,
+        expiresAt:
+          session.expiresAt.getTime(),
+        scanStartTime:
+          session.startTime?.getTime() ||
+          null,
+        scanEndTime:
+          session.endTime?.getTime() ||
+          null,
         qrData: attendanceUrl, // This is the URL to be embedded in QR
         qrTokenData, // Raw data for debugging
       });
@@ -704,6 +744,46 @@ router.post(
   }
 );
 
+router.post(
+  "/:classId/qr/stop",
+  protect,
+  async (req, res) => {
+    const { classId } = req.params;
+
+    try {
+      await QrSession.updateMany(
+        {
+          classId,
+          isActive: true,
+        },
+        {
+          $set: {
+            isActive: false,
+            endTime: new Date(),
+            expiresAt: new Date(),
+          },
+        }
+      );
+
+      res.json({
+        success: true,
+        message:
+          "QR session stopped successfully",
+      });
+    } catch (err) {
+      console.error(
+        "Stop QR Error:",
+        err
+      );
+
+      res.status(500).json({
+        message:
+          "Server error while stopping QR",
+      });
+    }
+  }
+);
+
 /**
  * @route   GET /api/attendance/:classId/qr/status
  */
@@ -714,25 +794,14 @@ router.get(
     const { classId } = req.params;
 
     try {
-      let activeSession = null;
-
-      for (const [
-        token,
-        session,
-      ] of qrSessions.entries()) {
-        if (
-          session.classId === classId &&
-          Date.now() <
-            session.expiresAt
-        ) {
-          activeSession = {
-            token,
-            ...session,
-          };
-
-          break;
-        }
-      }
+      const activeSession =
+        await QrSession.findOne({
+          classId,
+          isActive: true,
+          expiresAt: {
+            $gt: new Date(),
+          },
+        }).sort({ createdAt: -1 });
 
       if (!activeSession) {
         return res.json({
@@ -767,7 +836,7 @@ router.get(
       res.json({
         active: true,
         expiresAt:
-          activeSession.expiresAt,
+          activeSession.expiresAt.getTime(),
         markedCount:
           markedStudents.length,
         students: markedStudents,

@@ -350,15 +350,33 @@ export default function ClassPage() {
   /* =========================================================
      STOP QR
   ========================================================= */
-  const handleStopQR = () => {
-    setShowQR(false);
+  const handleStopQR = async () => {
+    try {
+      await API.post(
+        `/attendance/${id}/qr/stop`
+      );
 
-    setQrData(null);
+      setShowQR(false);
+      setQrData(null);
+      setQrStatus({
+        active: false,
+        students: [],
+      });
 
-    setQrStatus({
-      active: false,
-      students: [],
-    });
+      showToast(
+        "QR stopped successfully",
+        "success"
+      );
+    } catch (err) {
+      console.error(err);
+
+      showToast(
+        err.response?.data
+          ?.message ||
+          "Failed to stop QR",
+        "error"
+      );
+    }
   };
 
   /* =========================================================
