@@ -41,12 +41,12 @@ mongoose
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
 // Routes
-app.use("/api/teachers", authRoutes);
-app.use("/api/classes", classRoutes);
-app.use("/api/students", studentRoutes);
+app.use("/teachers", authRoutes);
+app.use("/classes", classRoutes);
+app.use("/students", studentRoutes);
 app.use("/students", studentMasterRoutes);
-app.use("/api/attendance", attendanceBatchStudentsRoutes);
-app.use("/api/attendance", attendanceRoutes);
+app.use("/attendance", attendanceBatchStudentsRoutes);
+app.use("/attendance", attendanceRoutes);
 
 
 // Root endpoint
