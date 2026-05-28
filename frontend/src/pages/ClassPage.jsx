@@ -4,9 +4,6 @@ import QRCode from "react-qr-code";
 import API from "../api/apiClient";
 import { useToast } from "../components/ToastProvider";
 
-// Define frontend URL for QR link
-const FRONTEND_URL = "https://attendance-oo1a.vercel.app";
-
 export default function ClassPage() {
   const { id } = useParams();
 
@@ -18,26 +15,46 @@ export default function ClassPage() {
   // true = present
   // false = absent
   // null = not marked
-  const [attendance, setAttendance] = useState({});
+  const [attendance, setAttendance] =
+    useState({});
 
-  const [showQR, setShowQR] = useState(false);
-  const [qrData, setQrData] = useState(null);
+  const [showQR, setShowQR] =
+    useState(false);
 
-  const getLocalDateString = (date = new Date()) => {
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [qrData, setQrData] =
+    useState(null);
 
-  const [qrStatus, setQrStatus] = useState({
-    active: false,
-    students: [],
-  });
+  const [timeLeft, setTimeLeft] =
+    useState(0);
+
+  const [qrStatus, setQrStatus] =
+    useState({
+      active: false,
+      students: [],
+    });
 
   const { showToast } = useToast();
+
+  /* =========================================================
+     DATE HELPER
+  ========================================================= */
+  const getLocalDateString = (
+    date = new Date()
+  ) => {
+    const d = new Date(date);
+
+    const year = d.getFullYear();
+
+    const month = String(
+      d.getMonth() + 1
+    ).padStart(2, "0");
+
+    const day = String(
+      d.getDate()
+    ).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
 
   /* =========================================================
      FETCH CLASS + ATTENDANCE
@@ -48,18 +65,25 @@ export default function ClassPage() {
         setLoading(true);
 
         // fetch class
-        const classRes = await API.get(`/classes/${id}`);
+        const classRes = await API.get(
+          `/classes/${id}`
+        );
 
         setCls(classRes.data);
 
-        const today = getLocalDateString();
+        const today =
+          getLocalDateString();
 
         // initialize all students as not marked
         const initialAttendance = {};
 
-        classRes.data.students.forEach((student) => {
-          initialAttendance[student._id] = null;
-        });
+        classRes.data.students.forEach(
+          (student) => {
+            initialAttendance[
+              student._id
+            ] = null;
+          }
+        );
 
         // fetch attendance
         try {
@@ -74,21 +98,27 @@ export default function ClassPage() {
             attRes.data?.records &&
             attRes.data.records.length > 0
           ) {
-            attRes.data.records.forEach((r) => {
-              // support both student and studentId
-              const studentObj =
-                r.student || r.studentId;
+            attRes.data.records.forEach(
+              (r) => {
+                const studentObj =
+                  r.student ||
+                  r.studentId;
 
-              const studentId =
-                typeof studentObj === "object"
-                  ? studentObj?._id?.toString()
-                  : studentObj?.toString();
+                const studentId =
+                  typeof studentObj ===
+                  "object"
+                    ? studentObj?._id?.toString()
+                    : studentObj?.toString();
 
-              if (studentId) {
-                initialAttendance[studentId] =
-                  Boolean(r.present);
+                if (studentId) {
+                  initialAttendance[
+                    studentId
+                  ] = Boolean(
+                    r.present
+                  );
+                }
               }
-            });
+            );
           }
         } catch (err) {
           console.log(
@@ -96,12 +126,15 @@ export default function ClassPage() {
           );
         }
 
-        setAttendance(initialAttendance);
+        setAttendance(
+          initialAttendance
+        );
       } catch (err) {
         console.error(err);
 
         setError(
-          err.response?.data?.message ||
+          err.response?.data
+            ?.message ||
             "Failed to load class"
         );
       } finally {
@@ -122,7 +155,8 @@ export default function ClassPage() {
       const remaining = Math.max(
         0,
         Math.floor(
-          (qrData.expiresAt - Date.now()) /
+          (qrData.expiresAt -
+            Date.now()) /
             1000
         )
       );
@@ -131,11 +165,13 @@ export default function ClassPage() {
 
       if (remaining <= 0) {
         setShowQR(false);
+
         setQrData(null);
       }
     }, 1000);
 
-    return () => clearInterval(interval);
+    return () =>
+      clearInterval(interval);
   }, [qrData]);
 
   /* =========================================================
@@ -144,47 +180,55 @@ export default function ClassPage() {
   useEffect(() => {
     if (!showQR || !qrData) return;
 
-    const fetchQRStatus = async () => {
-      try {
-        const res = await API.get(
-          `/attendance/${id}/qr/status`
-        );
+    const fetchQRStatus =
+      async () => {
+        try {
+          const res = await API.get(
+            `/attendance/${id}/qr/status`
+          );
 
-        setQrStatus(res.data);
+          setQrStatus(res.data);
 
-        if (
-          res.data.students &&
-          res.data.students.length > 0
-        ) {
-          setAttendance((prev) => {
-            const updated = { ...prev };
+          if (
+            res.data.students &&
+            res.data.students.length >
+              0
+          ) {
+            setAttendance((prev) => {
+              const updated = {
+                ...prev,
+              };
 
-            res.data.students.forEach((s) => {
-              const student =
-                cls?.students?.find(
-                  (st) =>
-                    st.rollNo?.toString() ===
-                    (
-                      s.rollNumber ||
-                      s.rollNo
-                    )?.toString()
-                );
+              res.data.students.forEach(
+                (s) => {
+                  const student =
+                    cls?.students?.find(
+                      (st) =>
+                        st.rollNo?.toString() ===
+                        (
+                          s.rollNumber ||
+                          s.rollNo
+                        )?.toString()
+                    );
 
-              if (student) {
-                updated[student._id] = true;
-              }
+                  if (student) {
+                    updated[
+                      student._id
+                    ] = true;
+                  }
+                }
+              );
+
+              return updated;
             });
-
-            return updated;
-          });
+          }
+        } catch (err) {
+          console.error(
+            "QR status fetch error",
+            err
+          );
         }
-      } catch (err) {
-        console.error(
-          "QR status fetch error",
-          err
-        );
-      }
-    };
+      };
 
     fetchQRStatus();
 
@@ -193,11 +237,12 @@ export default function ClassPage() {
       5000
     );
 
-    return () => clearInterval(interval);
+    return () =>
+      clearInterval(interval);
   }, [showQR, qrData, id, cls]);
 
   /* =========================================================
-     HANDLE CHANGE
+     HANDLE ATTENDANCE CHANGE
   ========================================================= */
   const handleChange = (
     studentId,
@@ -205,6 +250,7 @@ export default function ClassPage() {
   ) => {
     setAttendance((prev) => ({
       ...prev,
+
       [studentId]:
         value === "not_marked"
           ? null
@@ -220,12 +266,15 @@ export default function ClassPage() {
       attendance
     )
       .filter(
-        ([_, present]) => present !== null
+        ([_, present]) =>
+          present !== null
       )
-      .map(([studentId, present]) => ({
-        studentId,
-        present,
-      }));
+      .map(
+        ([studentId, present]) => ({
+          studentId,
+          present,
+        })
+      );
 
     if (records.length === 0) {
       showToast(
@@ -237,25 +286,28 @@ export default function ClassPage() {
     }
 
     try {
-      const today = getLocalDateString();
+      const today =
+        getLocalDateString();
 
-      await API.post(`/attendance/mark`, {
-        classId: id,
-        date: today,
-        records,
-      });
+      await API.post(
+        `/attendance/mark`,
+        {
+          classId: id,
+          date: today,
+          records,
+        }
+      );
 
       showToast(
         "Attendance saved successfully",
         "success"
       );
-
-      // NO reload needed now
     } catch (err) {
       console.error(err);
 
       showToast(
-        err.response?.data?.message ||
+        err.response?.data
+          ?.message ||
           "Failed to save attendance",
         "error"
       );
@@ -265,39 +317,42 @@ export default function ClassPage() {
   /* =========================================================
      GENERATE QR
   ========================================================= */
-  const handleGenerateQR = async () => {
-    try {
-      const res = await API.post(
-        `/attendance/${id}/qr/generate`,
-        {
-          validityMinutes: 5,
-        }
-      );
+  const handleGenerateQR =
+    async () => {
+      try {
+        const res = await API.post(
+          `/attendance/${id}/qr/generate`,
+          {
+            validityMinutes: 5,
+          }
+        );
 
-      setQrData(res.data);
+        setQrData(res.data);
 
-      setShowQR(true);
+        setShowQR(true);
 
-      showToast(
-        "QR generated successfully",
-        "success"
-      );
-    } catch (err) {
-      console.error(err);
+        showToast(
+          "QR generated successfully",
+          "success"
+        );
+      } catch (err) {
+        console.error(err);
 
-      showToast(
-        err.response?.data?.message ||
-          "Failed to generate QR",
-        "error"
-      );
-    }
-  };
+        showToast(
+          err.response?.data
+            ?.message ||
+            "Failed to generate QR",
+          "error"
+        );
+      }
+    };
 
   /* =========================================================
      STOP QR
   ========================================================= */
   const handleStopQR = () => {
     setShowQR(false);
+
     setQrData(null);
 
     setQrStatus({
@@ -352,6 +407,7 @@ export default function ClassPage() {
   ========================================================= */
   return (
     <div className="min-h-screen bg-gray-50 p-6">
+
       <div className="max-w-6xl mx-auto">
 
         {/* BACK */}
@@ -364,6 +420,7 @@ export default function ClassPage() {
 
         {/* HEADER */}
         <div className="bg-white rounded-xl shadow p-6 mt-4 mb-6">
+
           <h1 className="text-3xl font-bold">
             {cls.name}
           </h1>
@@ -374,6 +431,7 @@ export default function ClassPage() {
           </p>
 
           <div className="flex gap-4 mt-4">
+
             <div className="bg-blue-100 px-4 py-2 rounded">
               Total: {totalStudents}
             </div>
@@ -385,15 +443,19 @@ export default function ClassPage() {
             <div className="bg-red-100 px-4 py-2 rounded">
               Absent: {absentCount}
             </div>
+
           </div>
         </div>
 
         {/* QR SECTION */}
         <div className="bg-white rounded-xl shadow p-6 mb-6">
+
           <div className="flex gap-4">
 
             <button
-              onClick={handleGenerateQR}
+              onClick={
+                handleGenerateQR
+              }
               disabled={showQR}
               className={`px-5 py-3 rounded text-white ${
                 showQR
@@ -408,7 +470,9 @@ export default function ClassPage() {
 
             {showQR && (
               <button
-                onClick={handleStopQR}
+                onClick={
+                  handleStopQR
+                }
                 className="bg-red-500 text-white px-5 py-3 rounded"
               >
                 Stop QR
@@ -422,7 +486,9 @@ export default function ClassPage() {
               {/* QR */}
               <div className="bg-white p-4 border rounded">
                 <QRCode
-                  value={qrData.qrData}
+                  value={
+                    qrData.qrData
+                  }
                   size={200}
                 />
               </div>
@@ -432,7 +498,10 @@ export default function ClassPage() {
 
                 <h2 className="text-2xl font-bold">
                   Time Left:{" "}
-                  {Math.floor(timeLeft / 60)}:
+                  {Math.floor(
+                    timeLeft / 60
+                  )}
+                  :
                   {String(
                     timeLeft % 60
                   ).padStart(2, "0")}
@@ -448,29 +517,33 @@ export default function ClassPage() {
 
                 {/* LINK */}
                 <div className="bg-yellow-50 border border-yellow-200 p-4 rounded mt-6">
+
                   <p className="font-semibold mb-2">
-                    Student Attendance Link
+                    Student Attendance
+                    Link
                   </p>
 
                   <input
                     readOnly
-                    value={`${FRONTEND_URL}/student?data=${encodeURIComponent(
+                    value={
                       qrData.qrData
-                    )}`}
+                    }
                     className="w-full border p-2 rounded"
                   />
                 </div>
 
                 {/* MARKED */}
                 {qrStatus.students &&
-                  qrStatus.students.length >
-                    0 && (
+                  qrStatus.students
+                    .length > 0 && (
                     <div className="mt-6">
+
                       <p className="font-semibold mb-2">
                         Recently Marked:
                       </p>
 
                       <div className="flex flex-wrap gap-2">
+
                         {qrStatus.students.map(
                           (s, i) => (
                             <span
@@ -483,9 +556,11 @@ export default function ClassPage() {
                             </span>
                           )
                         )}
+
                       </div>
                     </div>
                   )}
+
               </div>
             </div>
           )}
@@ -493,16 +568,19 @@ export default function ClassPage() {
 
         {/* STUDENTS */}
         <div className="bg-white rounded-xl shadow p-6">
+
           <h2 className="text-3xl font-bold mb-6">
             Students
           </h2>
 
           <div className="space-y-4">
+
             {cls.students.map((s) => (
               <div
                 key={s._id}
                 className="bg-gray-100 p-4 rounded flex justify-between items-center"
               >
+
                 <div>
                   <p className="font-bold uppercase">
                     {s.name}
@@ -518,7 +596,9 @@ export default function ClassPage() {
                     attendance[s._id] ===
                     null
                       ? "not_marked"
-                      : attendance[s._id]
+                      : attendance[
+                          s._id
+                        ]
                       ? "present"
                       : "absent"
                   }
@@ -553,6 +633,7 @@ export default function ClassPage() {
                 </select>
               </div>
             ))}
+
           </div>
 
           {/* SUBMIT */}
@@ -562,6 +643,7 @@ export default function ClassPage() {
           >
             Submit Attendance
           </button>
+
         </div>
       </div>
     </div>
