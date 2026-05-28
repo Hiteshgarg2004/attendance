@@ -25,7 +25,7 @@ const app = express();
 // Middleware
 app.use(
   cors({
-    origin: ["https://attendance-fw8v.onrender.com"],
+    origin: ["https://attendance-oo1a.vercel.app"],
     credentials: true,
   })
 );
