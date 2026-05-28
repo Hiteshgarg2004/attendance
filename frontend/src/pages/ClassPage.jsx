@@ -451,9 +451,11 @@ export default function ClassPage() {
 
                   <input
                     readOnly
-                    value={`${window.location.origin}/student?data=${encodeURIComponent(
-                      qrData.qrData
-                    )}`}
+                    const FRONTEND_URL = "https://attendance-oo1a.vercel.app";
+
+value={`${FRONTEND_URL}/student?data=${encodeURIComponent(
+  qrData.qrData
+)}`}
                     className="w-full border p-2 rounded"
                   />
                 </div>
