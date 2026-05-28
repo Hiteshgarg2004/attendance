@@ -10,6 +10,9 @@ const router = express.Router();
 const QR_SECRET =
   process.env.QR_SECRET || "attendance-secret-key-2024";
 
+// Frontend URL from environment or default
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://attendance-oo1a.vercel.app";
+
 /**
  * Generate cryptographic signature for QR token
  */
@@ -661,19 +664,27 @@ router.post(
         studentsMarked: [],
       });
 
-      const qrData = JSON.stringify({
+      // Create QR data object
+      const qrTokenData = {
         token: sessionToken,
         classId,
         timestamp,
         signature,
-      });
+      };
+
+      // Encode the data for URL
+      const encodedData = encodeURIComponent(JSON.stringify(qrTokenData));
+
+      // Generate the full URL that should be embedded in the QR code
+      const attendanceUrl = `${FRONTEND_URL}/student?data=${encodedData}`;
 
       res.json({
         sessionToken,
         expiresAt,
         scanStartTime,
         scanEndTime,
-        qrData,
+        qrData: attendanceUrl, // This is the URL to be embedded in QR
+        qrTokenData, // Raw data for debugging
       });
     } catch (err) {
       console.error(
@@ -827,4 +838,3 @@ router.get("/:classId", async (req, res) => {
 });
 
 export default router;
-
