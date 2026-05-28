@@ -4,6 +4,9 @@ import QRCode from "react-qr-code";
 import API from "../api/apiClient";
 import { useToast } from "../components/ToastProvider";
 
+// Define frontend URL for QR link
+const FRONTEND_URL = "https://attendance-oo1a.vercel.app";
+
 export default function ClassPage() {
   const { id } = useParams();
 
@@ -451,11 +454,9 @@ export default function ClassPage() {
 
                   <input
                     readOnly
-                    const FRONTEND_URL = "https://attendance-oo1a.vercel.app";
-
-value={`${FRONTEND_URL}/student?data=${encodeURIComponent(
-  qrData.qrData
-)}`}
+                    value={`${FRONTEND_URL}/student?data=${encodeURIComponent(
+                      qrData.qrData
+                    )}`}
                     className="w-full border p-2 rounded"
                   />
                 </div>
